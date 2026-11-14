@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recherche immo groupée</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Plan : une colonne mobile, onglets collants en haut ; bleu ardoise + vert sapin, ambre pour les doublons */
+:root{
+  --bg:#f3f5f7;
+  --surface:#ffffff;
+  --ink:#16212e;
+  --muted:#5b6876;
+  --line:#dbe1e7;
+  --accent:#1d6b57;
+  --accent-ink:#ffffff;
+  --accent-soft:#e1f0eb;
+  --warn:#9a5b00;
+  --warn-soft:#fdf1dc;
+  --bad:#a83a2e;
+  --font-display:"Bricolage Grotesque", ui-rounded, "Segoe UI", system-ui, sans-serif;
+  --font-body:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#10161d; --surface:#18212b; --ink:#e8edf2; --muted:#9aa7b4; --line:#2a3542;
+    --accent:#4fb894; --accent-ink:#0d1a15; --accent-soft:#1b332b;
+    --warn:#f0b450; --warn-soft:#33270f; --bad:#ef7d6f;
+    color-scheme:dark;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 var(--font-body);-webkit-text-size-adjust:100%}
+h1,h2,h3{font-family:var(--font-display);text-wrap:balance;margin:0;line-height:1.15}
+a{color:var(--accent)}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.wrap{max-width:760px;margin:0 auto;padding:0 16px}
+
+header.top{padding:22px 0 10px}
+header.top h1{font-size:1.7rem;font-weight:800;letter-spacing:-.01em}
+header.top p{margin:.35rem 0 0;color:var(--muted);font-size:.95rem}
+
+nav.tabs{position:sticky;top:0;z-index:5;background:var(--bg);padding:10px 0;border-bottom:1px solid var(--line)}
+nav.tabs .wrap{display:flex;gap:8px}
+nav.tabs a{flex:1;text-align:center;text-decoration:none;color:var(--muted);font-weight:600;padding:10px 8px;border-radius:10px;border:1px solid var(--line);background:var(--surface)}
+nav.tabs a[aria-current="page"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+nav.tabs .count{display:inline-block;min-width:1.4em;padding:0 .35em;margin-left:.3em;border-radius:99px;background:var(--accent);color:var(--accent-ink);font-size:.8rem;font-variant-numeric:tabular-nums}
+
+main{padding:16px 0 60px}
+section.view{display:none}
+section.view.on{display:grid;gap:18px}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px}
+.panel h2{font-size:1.15rem;margin-bottom:12px}
+.hint{color:var(--muted);font-size:.88rem;margin:0}
+
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.grid .full{grid-column:1/-1}
+label.f{display:grid;gap:4px;font-size:.85rem;font-weight:600;color:var(--muted)}
+label.f input,label.f select,label.f textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);font-size:1rem;font-weight:400;color:var(--ink)}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{flex:1;padding:10px 6px;border:0;background:var(--bg);cursor:pointer;font-weight:600;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.check{display:flex;gap:10px;align-items:center;font-size:.92rem}
+.check input{width:20px;height:20px;accent-color:var(--accent)}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-weight:600;cursor:pointer;text-decoration:none;color:var(--ink);font-size:.92rem}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.small{padding:6px 10px;font-size:.84rem}
+.btn.ghost{background:transparent}
+.btn.wa{background:#1f9d55;border-color:#1f9d55;color:#fff}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+
+.progress{display:flex;align-items:center;gap:12px}
+.bar{flex:1;height:8px;border-radius:99px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent);width:0;transition:width .25s}
+@media (prefers-reduced-motion: reduce){.bar i{transition:none}}
+.progress b{font-variant-numeric:tabular-nums;font-size:.9rem}
+
+.group h3{font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-family:var(--font-body);font-weight:600;margin:6px 0 8px}
+.sites{display:grid;gap:8px}
+.site{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px}
+.site.seen{opacity:.62}
+.site .tick{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);background:transparent;cursor:pointer;display:grid;place-items:center;padding:0}
+.site.seen .tick{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.site .name{font-weight:600}
+.site .meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:3px}
+.chip{font-size:.74rem;padding:2px 8px;border-radius:99px;background:var(--bg);color:var(--muted);border:1px solid var(--line);white-space:nowrap}
+.chip.good{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+.chip.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.site .acts{display:flex;gap:6px}
+
+.banner{background:var(--warn-soft);color:var(--warn);border-radius:12px;padding:10px 14px;font-size:.9rem}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.stat b{display:block;font-family:var(--font-display);font-size:1.3rem;font-variant-numeric:tabular-nums}
+.stat span{font-size:.78rem;color:var(--muted)}
+
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+.toolbar select{padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+
+.cards{display:grid;gap:10px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;display:grid;gap:8px;border-left:5px solid var(--line)}
+.card.dup{border-left-color:var(--warn)}
+.card.best{border-left-color:var(--accent)}
+.card.out{opacity:.55}
+.card .head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.card .title{font-weight:600;overflow-wrap:anywhere}
+.card .price{font-family:var(--font-display);font-size:1.25rem;font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums}
+.card .facts{display:flex;flex-wrap:wrap;gap:6px 14px;color:var(--muted);font-size:.9rem;font-variant-numeric:tabular-nums}
+.card .note{font-size:.9rem;background:var(--bg);border-radius:8px;padding:6px 10px;overflow-wrap:anywhere}
+.card .foot{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+.card select{padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font-size:.88rem}
+.alert{font-size:.86rem;color:var(--warn);background:var(--warn-soft);border-radius:8px;padding:6px 10px}
+.alert.good{color:var(--accent);background:var(--accent-soft)}
+
+.empty{text-align:center;color:var(--muted);padding:20px}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:.9rem;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw;text-align:center}
+.toast.on{opacity:1}
+footer{color:var(--muted);font-size:.8rem;padding:10px 0 30px}
+
+@media (max-width:420px){
+  .grid{grid-template-columns:1fr}
+  .site{grid-template-columns:auto 1fr}
+  .site .acts{grid-column:1/-1}
+  .site .acts .btn{flex:1}
+  .stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .stat b{font-size:1.1rem}
+}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <h1>Recherche immo groupée</h1>
+  <p>Tes critères une seule fois, tous les sites d'annonces d'un coup. Puis tu notes les biens qui te plaisent et l'appli repère ceux publiés sur plusieurs sites.</p>
+</div></header>
+
+<nav class="tabs" aria-label="Sections"><div class="wrap">
+  <a href="#recherche" id="tab-recherche">Rechercher</a>
+  <a href="#annonces" id="tab-annonces">Mes annonces <span class="count" id="tab-count">0</span></a>
+</div></nav>
+
+<main><div class="wrap">
+
+<!-- ============ RECHERCHE ============ -->
+<section class="view" id="view-recherche">
+  <form class="panel" id="crit" autocomplete="off">
+    <h2>Ce que tu cherches</h2>
+    <div class="grid">
+      <div class="full">
+        <div class="seg" role="group" aria-label="Projet">
+          <button type="button" data-projet="achat" aria-pressed="true">Acheter</button>
+          <button type="button" data-projet="location" aria-pressed="false">Louer</button>
+        </div>
+      </div>
+      <label class="f full">Type de bien
+        <select id="c-type">
+          <option value="appartement">Appartement</option>
+          <option value="maison">Maison</option>
+          <option value="les deux">Appartement ou maison</option>
+        </select>
+      </label>
+      <label class="f">Ville
+        <input id="c-ville" placeholder="ex. Lyon" inputmode="text">
+      </label>
+      <label class="f">Code postal
+        <input id="c-cp" placeholder="ex. 69007" inputmode="numeric" maxlength="5">
+      </label>
+      <label class="f">Budget min (€)
+        <input id="c-pmin" inputmode="numeric" placeholder="—">
+      </label>
+      <label class="f">Budget max (€)
+        <input id="c-pmax" inputmode="numeric" placeholder="ex. 300000">
+      </label>
+      <label class="f">Surface min (m²)
+        <input id="c-smin" inputmode="numeric" placeholder="ex. 50">
+      </label>
+      <label class="f">Pièces min
+        <select id="c-rmin">
+          <option value="">Peu importe</option>
+          <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+        </select>
+      </label>
+      <label class="f full">Mots-clés (facultatif)
+        <input id="c-kw" placeholder="ex. balcon, parking, ascenseur">
+      </label>
+      <label class="check full"><input type="checkbox" id="c-recent"> Seulement les annonces de moins de 7 jours (recherches via Google)</label>
+    </div>
+  </form>
+
+  <div class="panel">
+    <div class="progress">
+      <div class="bar"><i id="seen-bar"></i></div>
+      <b id="seen-label">0 / 0 sites vus</b>
+      <button class="btn small ghost" id="seen-reset" type="button">Remettre à zéro</button>
+    </div>
+    <p class="hint" style="margin-top:10px">Touche ✓ après avoir regardé un site pour savoir où tu en es. Les liens marqués « via Google » cherchent dans les annonces de ce site quand il n'accepte pas les critères dans son adresse.</p>
+  </div>
+
+  <div id="site-groups" style="display:grid;gap:14px"></div>
+
+  <div class="row">
+    <button class="btn" id="copy-links" type="button">Copier tous les liens</button>
+    <a class="btn wa" id="wa-links" href="#" target="_blank" rel="noopener">Envoyer la recherche sur WhatsApp</a>
+  </div>
+</section>
+
+<!-- ============ ANNONCES ============ -->
+<section class="view" id="view-annonces">
+  <form class="panel" id="add" autocomplete="off">
+    <h2>Ajouter une annonce repérée</h2>
+    <div class="grid">
+      <label class="f full">Lien de l'annonce
+        <input id="a-url" type="url" placeholder="Colle le lien copié depuis l'appli ou le site" inputmode="url">
+      </label>
+      <label class="f">Prix (€)
+        <input id="a-prix" inputmode="numeric" placeholder="ex. 289000" required>
+      </label>
+      <label class="f">Surface (m²)
+        <input id="a-surf" inputmode="decimal" placeholder="ex. 62">
+      </label>
+      <label class="f">Pièces
+        <input id="a-pieces" inputmode="numeric" placeholder="ex. 3">
+      </label>
+      <label class="f">Ville ou quartier
+        <input id="a-ville" placeholder="ex. Lyon 7e">
+      </label>
+      <label class="f full">Titre ou note
+        <input id="a-note" placeholder="ex. T3 Jean Macé, balcon, 3e étage">
+      </label>
+    </div>
+    <div class="row" style="margin-top:12px;justify-content:space-between">
+      <span class="hint" id="a-site">Le site est reconnu à partir du lien.</span>
+      <button class="btn primary" type="submit">Ajouter</button>
+    </div>
+  </form>
+
+  <div class="banner" id="demo-banner" hidden>Ce sont des exemples pour te montrer le principe. Ils disparaissent dès que tu ajoutes ta première annonce.</div>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="toolbar">
+    <select id="sort" aria-label="Trier">
+      <option value="recent">Plus récentes</option>
+      <option value="prix">Prix croissant</option>
+      <option value="m2">Prix au m² croissant</option>
+      <option value="surf">Surface décroissante</option>
+    </select>
+    <div class="row">
+      <button class="btn small" id="copy-list" type="button">Copier ma sélection</button>
+      <a class="btn small wa" id="wa-list" href="#" target="_blank" rel="noopener">WhatsApp</a>
+    </div>
+  </div>
+
+  <div class="cards" id="cards"></div>
+</section>
+
+</div></main>
+
+<footer><div class="wrap">Tout reste enregistré sur ce téléphone, dans ce navigateur. Rien n'est envoyé ailleurs.</div></footer>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------- stockage local (protégé) ---------- */
+var store = {
+  get: function(k, d){ try{ var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } },
+  set: function(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+var K_CRIT = "immo-criteres-v1", K_SEEN = "immo-vus-v1", K_ADS = "immo-annonces-v1";
+
+/* ---------- utilitaires ---------- */
+function $(id){ return document.getElementById(id); }
+function num(v){ if(v==null) return null; var n = parseFloat(String(v).replace(/\s|€/g,"").replace(",", ".")); return isFinite(n) && n>0 ? n : null; }
+function eur(n){ return n==null ? "—" : Math.round(n).toLocaleString("fr-FR") + " €"; }
+function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+function slug(s){ return String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,""); }
+function normCity(s){ return slug(s).replace(/-(\d+)(e|er|eme)?$/,"").replace(/^(st)-/,"saint-"); }
+var toastT;
+function toast(msg){ var t=$("toast"); t.textContent=msg; t.classList.add("on"); clearTimeout(toastT); toastT=setTimeout(function(){ t.classList.remove("on"); }, 2200); }
+function copy(text, ok){
+  function fallback(){
+    var ta=document.createElement("textarea"); ta.value=text; ta.style.position="fixed"; ta.style.opacity="0"; document.body.appendChild(ta); ta.select();
+    try{ document.execCommand("copy"); toast(ok); }catch(e){ toast("Copie impossible : sélectionne le texte à la main."); }
+    document.body.removeChild(ta);
+  }
+  if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(function(){ toast(ok); }, fallback); }
+  else fallback();
+}
+
+/* ---------- critères ---------- */
+var crit = Object.assign({projet:"achat", type:"appartement", ville:"", cp:"", pmin:"", pmax:"", smin:"", rmin:"", kw:"", recent:false}, store.get(K_CRIT, {}));
+var fields = {type:"c-type", ville:"c-ville", cp:"c-cp", pmin:"c-pmin", pmax:"c-pmax", smin:"c-smin", rmin:"c-rmin", kw:"c-kw"};
+Object.keys(fields).forEach(function(k){ $(fields[k]).value = crit[k] || ""; });
+$("c-recent").checked = !!crit.recent;
+function paintProjet(){ document.querySelectorAll("[data-projet]").forEach(function(b){ b.setAttribute("aria-pressed", String(b.dataset.projet===crit.projet)); }); }
+paintProjet();
+document.querySelectorAll("[data-projet]").forEach(function(b){ b.addEventListener("click", function(){ crit.projet=b.dataset.projet; paintProjet(); saveCrit(); }); });
+$("crit").addEventListener("input", function(){
+  Object.keys(fields).forEach(function(k){ crit[k] = $(fields[k]).value.trim(); });
+  crit.recent = $("c-recent").checked; saveCrit();
+});
+$("crit").addEventListener("submit", function(e){ e.preventDefault(); });
+function saveCrit(){ store.set(K_CRIT, crit); renderSites(); }
+
+/* ---------- sites ---------- */
+function typeWords(){ return crit.type==="les deux" ? "appartement OR maison" : crit.type; }
+function google(domain){
+  var q = ["site:"+domain, typeWords(), crit.projet==="achat" ? "à vendre" : "à louer"];
+  if(crit.ville) q.push(crit.ville);
+  if(crit.cp) q.push(crit.cp);
+  if(crit.rmin) q.push(crit.rmin+" pièces");
+  if(crit.kw) q.push(crit.kw);
+  var u = "https://www.google.com/search?q=" + encodeURIComponent(q.join(" "));
+  if(crit.recent) u += "&tbs=qdr:w";
+  return u;
+}
+function lbc(){
+  var p = ["category=" + (crit.projet==="achat" ? 9 : 10)];
+  p.push("real_estate_type=" + (crit.type==="maison" ? "1" : crit.type==="appartement" ? "2" : "1,2"));
+  if(crit.ville) p.push("locations=" + encodeURIComponent(crit.ville.trim() + (crit.cp ? "_"+crit.cp : "")));
+  var a=num(crit.pmin), b=num(crit.pmax);
+  if(a||b) p.push("price=" + (a?Math.round(a):"min") + "-" + (b?Math.round(b):"max"));
+  if(num(crit.smin)) p.push("square=" + Math.round(num(crit.smin)) + "-max");
+  if(crit.rmin) p.push("rooms=" + crit.rmin + "-max");
+  if(crit.kw) p.push("text=" + encodeURIComponent(crit.kw));
+  return {url:"https://www.leboncoin.fr/recherche?" + p.join("&"), level:"filtres"};
+}
+function bienici(){
+  if(!crit.ville || !/^\d{5}$/.test(crit.cp)) return null;
+  return {url:"https://www.bienici.com/recherche/" + (crit.projet==="achat"?"achat":"location") + "/" + slug(crit.ville) + "-" + crit.cp, level:"ville"};
+}
+
+var SITES = [
+  {g:"Les incontournables", id:"leboncoin", name:"leboncoin", kind:"Particuliers et agences", domain:"leboncoin.fr", home:"https://www.leboncoin.fr/", direct:lbc},
+  {g:"Les incontournables", id:"seloger", name:"SeLoger", kind:"Agences", domain:"seloger.com", home:"https://www.seloger.com/"},
+  {g:"Les incontournables", id:"bienici", name:"Bien'ici", kind:"Agences", domain:"bienici.com", home:"https://www.bienici.com/", direct:bienici},
+  {g:"Les incontournables", id:"logicimmo", name:"Logic-Immo", kind:"Agences", domain:"logic-immo.com", home:"https://www.logic-immo.com/"},
+  {g:"Les incontournables", id:"figaro", name:"Figaro Immobilier", kind:"Agences", domain:"immobilier.lefigaro.fr", home:"https://immobilier.lefigaro.fr/"},
+  {g:"Entre particuliers", id:"pap", name:"PAP", kind:"Sans frais d'agence", domain:"pap.fr", home:"https://www.pap.fr/"},
+  {g:"Entre particuliers", id:"entreparticuliers", name:"Entreparticuliers", kind:"Sans frais d'agence", domain:"entreparticuliers.com", home:"https://www.entreparticuliers.com/"},
+  {g:"Entre particuliers", id:"paruvendu", name:"ParuVendu", kind:"Particuliers et agences", domain:"paruvendu.fr", home:"https://www.paruvendu.fr/immobilier/"},
+  {g:"Réseaux d'agences et notaires", id:"notaires", name:"Immobilier Notaires", kind:"Notaires", domain:"immobilier.notaires.fr", home:"https://www.immobilier.notaires.fr/"},
+  {g:"Réseaux d'agences et notaires", id:"century21", name:"Century 21", kind:"Réseau d'agences", domain:"century21.fr", home:"https://www.century21.fr/"},
+  {g:"Réseaux d'agences et notaires", id:"orpi", name:"Orpi", kind:"Réseau d'agences", domain:"orpi.com", home:"https://www.orpi.com/"},
+  {g:"Réseaux d'agences et notaires", id:"laforet", name:"Laforêt", kind:"Réseau d'agences", domain:"laforet.com", home:"https://www.laforet.com/"},
+  {g:"Réseaux d'agences et notaires", id:"guyhoquet", name:"Guy Hoquet", kind:"Réseau d'agences", domain:"guy-hoquet.com", home:"https://www.guy-hoquet.com/"},
+  {g:"Réseaux d'agences et notaires", id:"foncia", name:"Foncia", kind:"Réseau d'agences", domain:"fr.foncia.com", home:"https://fr.foncia.com/"},
+  {g:"Réseaux d'agences et notaires", id:"ouestfrance", name:"Ouest-France Immo", kind:"Agences, Ouest surtout", domain:"ouestfrance-immo.com", home:"https://www.ouestfrance-immo.com/"},
+  {g:"Agrégateurs et alertes", id:"prettosearch", name:"Pretto Search", kind:"Appli qui regroupe ~15 sites", domain:"pretto.fr", home:"https://pretto.fr/notre-service/app-mobile", noGoogle:true},
+  {g:"Agrégateurs et alertes", id:"jinka", name:"Jinka", kind:"Alertes multi-sites, sans SeLoger", domain:"jinka.fr", home:"https://www.jinka.fr/", noGoogle:true},
+  {g:"Agrégateurs et alertes", id:"zimo", name:"Zimo", kind:"Agrégateur", domain:"zimo.fr", home:"https://www.zimo.fr/"},
+  {g:"Agrégateurs et alertes", id:"superimmo", name:"Superimmo", kind:"Agrégateur", domain:"superimmo.com", home:"https://www.superimmo.com/"},
+  {g:"Agrégateurs et alertes", id:"greenacres", name:"Green-Acres", kind:"Agrégateur, campagne et étranger", domain:"green-acres.fr", home:"https://www.green-acres.fr/"}
+];
+function linkFor(s){
+  var d = s.direct ? s.direct() : null;
+  if(d) return d;
+  if(s.noGoogle) return {url:s.home, level:"site"};
+  return {url:google(s.domain), level:"google"};
+}
+var seen = store.get(K_SEEN, {});
+var LEVEL = {filtres:["Tes filtres appliqués","good"], ville:["Ville appliquée","good"], google:["Via Google",""], site:["Ouvre l'appli ou le site","warn"]};
+
+function renderSites(){
+  var groups = {}, order = [];
+  SITES.forEach(function(s){ if(!groups[s.g]){ groups[s.g]=[]; order.push(s.g); } groups[s.g].push(s); });
+  var html = order.map(function(g){
+    return '<div class="group"><h3>'+esc(g)+'</h3><div class="sites">' + groups[g].map(function(s){
+      var l = linkFor(s), lv = LEVEL[l.level], isSeen = !!seen[s.id];
+      return '<div class="site'+(isSeen?' seen':'')+'">'+
+        '<button type="button" class="tick" data-seen="'+s.id+'" aria-pressed="'+isSeen+'" aria-label="Marquer '+esc(s.name)+' comme vu">'+(isSeen?'✓':'')+'</button>'+
+        '<div><div class="name">'+esc(s.name)+'</div><div class="meta"><span class="chip">'+esc(s.kind)+'</span><span class="chip '+lv[1]+'">'+lv[0]+'</span></div></div>'+
+        '<div class="acts"><a class="btn primary small" href="'+esc(l.url)+'" target="_blank" rel="noopener" data-open="'+s.id+'">Voir les annonces</a>'+
+        (l.level!=="site" ? '<a class="btn small" href="'+esc(s.home)+'" target="_blank" rel="noopener">Site</a>' : '')+'</div>'+
+      '</div>';
+    }).join("") + '</div></div>';
+  }).join("");
+  $("site-groups").innerHTML = html;
+  var n = SITES.filter(function(s){ return seen[s.id]; }).length;
+  $("seen-label").textContent = n + " / " + SITES.length + " sites vus";
+  $("seen-bar").style.width = (100*n/SITES.length) + "%";
+  $("wa-links").href = "https://wa.me/?text=" + encodeURIComponent(searchText(true));
+}
+function searchText(short){
+  var head = "Recherche immo : " + (crit.projet==="achat"?"achat":"location") + ", " + crit.type + (crit.ville ? ", " + crit.ville : "") + (crit.cp ? " " + crit.cp : "") + (crit.pmax ? ", max " + eur(num(crit.pmax)) : "") + (crit.smin ? ", " + crit.smin + " m² min" : "") + (crit.rmin ? ", " + crit.rmin + " pièces min" : "");
+  var list = (short ? SITES.filter(function(s){ return s.g==="Les incontournables" || s.id==="pap"; }) : SITES);
+  return head + "\n\n" + list.map(function(s){ return s.name + " : " + linkFor(s).url; }).join("\n");
+}
+$("site-groups").addEventListener("click", function(e){
+  var t = e.target.closest("[data-seen]");
+  if(t){ var id=t.dataset.seen; if(seen[id]) delete seen[id]; else seen[id]=Date.now(); store.set(K_SEEN, seen); renderSites(); return; }
+  var o = e.target.closest("[data-open]");
+  if(o && !seen[o.dataset.open]){ seen[o.dataset.open]=Date.now(); store.set(K_SEEN, seen); setTimeout(renderSites, 300); }
+});
+$("seen-reset").addEventListener("click", function(){ seen={}; store.set(K_SEEN, seen); renderSites(); });
+$("copy-links").addEventListener("click", function(){ copy(searchText(false), "Les " + SITES.length + " liens sont copiés."); });
+
+/* ---------- annonces ---------- */
+var ads = store.get(K_ADS, []);
+var EXAMPLES = [
+  {id:"ex1", demo:true, url:"https://www.leboncoin.fr/ad/ventes_immobilieres/0000000001", prix:289000, surf:62, pieces:3, ville:"Lyon 7e", note:"T3 lumineux Jean Macé, balcon", statut:"favori", t:4},
+  {id:"ex2", demo:true, url:"https://www.seloger.com/annonces/achat/appartement/lyon-7eme-69/exemple.htm", prix:299000, surf:61.5, pieces:3, ville:"Lyon 7e", note:"Appartement 3 pièces Jean Macé", statut:"nouveau", t:3},
+  {id:"ex3", demo:true, url:"https://www.bienici.com/annonce/achat/lyon-8e-69008/appartement/exemple", prix:265000, surf:55, pieces:3, ville:"Lyon 8e", note:"Proche tram T2, travaux à prévoir", statut:"visite", t:2},
+  {id:"ex4", demo:true, url:"https://www.pap.fr/annonces/appartement-villeurbanne-exemple", prix:315000, surf:70, pieces:4, ville:"Villeurbanne", note:"Sans frais d'agence, parking", statut:"contact", t:1}
+];
+var STATUTS = {nouveau:"À voir", contact:"Contacté", visite:"Visite prévue", favori:"Coup de cœur", ecarte:"Écarté"};
+
+function siteOf(url){
+  if(!url) return "Autre";
+  var h; try{ h = new URL(url).hostname.replace(/^www\./,""); }catch(e){ return "Autre"; }
+  for(var i=0;i<SITES.length;i++){ var d=SITES[i].domain.replace(/^(fr|www)\./,""); if(h===d || h.endsWith("."+d) || h.endsWith(d)) return SITES[i].name; }
+  if(/lbc\.|leboncoin/.test(h)) return "leboncoin";
+  return h;
+}
+$("a-url").addEventListener("input", function(){
+  var v=$("a-url").value.trim();
+  $("a-site").textContent = v ? "Site reconnu : " + siteOf(v) : "Le site est reconnu à partir du lien.";
+});
+$("add").addEventListener("submit", function(e){
+  e.preventDefault();
+  var raw = $("a-url").value.trim(), m = raw.match(/https?:\/\/\S+/);
+  var ad = {id:"a"+Date.now().toString(36), url:m?m[0]:"", prix:num($("a-prix").value), surf:num($("a-surf").value), pieces:num($("a-pieces").value), ville:$("a-ville").value.trim(), note:$("a-note").value.trim(), statut:"nouveau", t:Date.now()};
+  if(!ad.prix){ toast("Indique au moins le prix."); $("a-prix").focus(); return; }
+  if(!ad.note && !ad.url){ toast("Ajoute un lien ou une note pour t'y retrouver."); return; }
+  ads.push(ad); store.set(K_ADS, ads);
+  $("add").reset(); $("a-site").textContent = "Le site est reconnu à partir du lien.";
+  renderAds(); toast("Annonce ajoutée.");
+});
+
+/* Recoupement : même ville, surface à ±4 % (ou 2 m²), même nb de pièces, prix à ±10 % */
+function same(a,b){
+  if(a.url && b.url && a.url===b.url) return true;
+  if(!a.surf || !b.surf) return false;
+  var ca=normCity(a.ville), cb=normCity(b.ville);
+  if(ca && cb && ca!==cb) return false;
+  if(Math.abs(a.surf-b.surf) > Math.max(2, 0.04*Math.max(a.surf,b.surf))) return false;
+  if(a.pieces && b.pieces && a.pieces!==b.pieces) return false;
+  return Math.abs(a.prix-b.prix) <= 0.10*Math.max(a.prix,b.prix);
+}
+function groupsOf(list){
+  var parent = list.map(function(_,i){ return i; });
+  function f(i){ return parent[i]===i ? i : (parent[i]=f(parent[i])); }
+  for(var i=0;i<list.length;i++) for(var j=i+1;j<list.length;j++) if(same(list[i],list[j])) parent[f(i)]=f(j);
+  var g={}; list.forEach(function(a,i){ var r=f(i); (g[r]=g[r]||[]).push(a); });
+  var map={}; Object.keys(g).forEach(function(r){ g[r].forEach(function(a){ map[a.id]=g[r]; }); });
+  return map;
+}
+function median(arr){ if(!arr.length) return null; var s=arr.slice().sort(function(a,b){return a-b;}), m=Math.floor(s.length/2); return s.length%2 ? s[m] : (s[m-1]+s[m])/2; }
+
+function renderAds(){
+  var demo = ads.length===0, list = demo ? EXAMPLES : ads;
+  $("demo-banner").hidden = !demo;
+  $("tab-count").textContent = ads.length;
+  var active = list.filter(function(a){ return a.statut!=="ecarte"; });
+  var grp = groupsOf(active);
+  var m2 = active.filter(function(a){ return a.surf; }).map(function(a){ return a.prix/a.surf; });
+  var med = median(m2);
+  var dupCount = 0, seenG = {};
+  active.forEach(function(a){ var g=grp[a.id]; if(g.length>1 && !seenG[g[0].id]){ seenG[g[0].id]=1; dupCount++; } });
+  $("stats").innerHTML =
+    '<div class="stat"><b>'+active.length+'</b><span>annonces suivies</span></div>'+
+    '<div class="stat"><b>'+(med?eur(med).replace(" €",""):"—")+'</b><span>€/m² médian</span></div>'+
+    '<div class="stat"><b>'+dupCount+'</b><span>bien'+(dupCount>1?"s":"")+' sur plusieurs sites</span></div>';
+
+  var sort = $("sort").value;
+  var sorted = list.slice().sort(function(a,b){
+    if((a.statut==="ecarte") !== (b.statut==="ecarte")) return a.statut==="ecarte" ? 1 : -1;
+    if(sort==="prix") return a.prix-b.prix;
+    if(sort==="m2") return (a.surf?a.prix/a.surf:1e12)-(b.surf?b.prix/b.surf:1e12);
+    if(sort==="surf") return (b.surf||0)-(a.surf||0);
+    return b.t-a.t;
+  });
+  if(!sorted.length){ $("cards").innerHTML = '<div class="empty">Aucune annonce pour l\'instant.</div>'; return; }
+  $("cards").innerHTML = sorted.map(function(a){
+    var out = a.statut==="ecarte", g = out ? [a] : grp[a.id], others = g.filter(function(x){ return x!==a; });
+    var cheapest = g.reduce(function(m,x){ return x.prix<m.prix?x:m; }, g[0]);
+    var cls = "card" + (out?" out":"") + (others.length ? (cheapest===a ? " best" : " dup") : "");
+    var pm2 = a.surf ? a.prix/a.surf : null;
+    var vsMed = (pm2 && med && !out && m2.length>1) ? Math.round(100*(pm2-med)/med) : null;
+    var site = siteOf(a.url);
+    var alert = "";
+    if(others.length){
+      var names = others.map(function(x){ return esc(siteOf(x.url)) + " (" + eur(x.prix) + ")"; }).join(", ");
+      alert = cheapest===a
+        ? '<div class="alert good">Sans doute le même bien que sur ' + names + '. C\'est ici le prix le plus bas.</div>'
+        : '<div class="alert">Sans doute le même bien que sur ' + names + '. Moins cher sur ' + esc(siteOf(cheapest.url)) + ' : ' + eur(a.prix-cheapest.prix) + ' d\'écart.</div>';
+    }
+    var sel = a.demo ? '<span class="chip">'+STATUTS[a.statut]+'</span>' :
+      '<select data-statut="'+a.id+'" aria-label="Statut">'+Object.keys(STATUTS).map(function(k){ return '<option value="'+k+'"'+(k===a.statut?' selected':'')+'>'+STATUTS[k]+'</option>'; }).join("")+'</select>';
+    return '<article class="'+cls+'">'+
+      '<div class="head"><div><div class="title">'+esc(a.note || "Annonce " + site)+'</div>'+
+        '<div class="meta" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px"><span class="chip">'+esc(site)+'</span>'+(a.demo?'<span class="chip warn">Exemple</span>':'')+'</div></div>'+
+        '<div class="price">'+eur(a.prix)+'</div></div>'+
+      '<div class="facts">'+
+        (a.surf?'<span>'+String(a.surf).replace(".",",")+' m²</span>':'')+
+        (a.pieces?'<span>'+a.pieces+' pièce'+(a.pieces>1?'s':'')+'</span>':'')+
+        (a.ville?'<span>'+esc(a.ville)+'</span>':'')+
+        (pm2?'<span>'+eur(pm2)+'/m²'+(vsMed!==null?' · '+(vsMed>0?'+':'')+vsMed+' % vs médiane':'')+'</span>':'')+
+      '</div>'+ alert +
+      '<div class="foot">'+sel+'<div class="row">'+
+        (a.url && !a.demo?'<a class="btn small" href="'+esc(a.url)+'" target="_blank" rel="noopener">Ouvrir</a>':'')+
+        (a.demo?'':'<button type="button" class="btn small ghost" data-del="'+a.id+'" aria-label="Supprimer">Supprimer</button>')+
+      '</div></div>'+
+    '</article>';
+  }).join("");
+  $("wa-list").href = "https://wa.me/?text=" + encodeURIComponent(listText());
+}
+function listText(){
+  var list = (ads.length?ads:[]).filter(function(a){ return a.statut!=="ecarte"; });
+  if(!list.length) return "Ma sélection immo est encore vide.";
+  return "Ma sélection immo :\n\n" + list.map(function(a){
+    return "• " + (a.note || siteOf(a.url)) + " — " + eur(a.prix) + (a.surf ? ", " + a.surf + " m²" : "") + (a.ville ? ", " + a.ville : "") + " [" + STATUTS[a.statut] + "]" + (a.url ? "\n  " + a.url : "");
+  }).join("\n\n");
+}
+$("cards").addEventListener("change", function(e){
+  var s = e.target.closest("[data-statut]"); if(!s) return;
+  ads.forEach(function(a){ if(a.id===s.dataset.statut) a.statut=s.value; }); store.set(K_ADS, ads); renderAds();
+});
+$("cards").addEventListener("click", function(e){
+  var d = e.target.closest("[data-del]"); if(!d) return;
+  if(d.dataset.armed){ ads = ads.filter(function(a){ return a.id!==d.dataset.del; }); store.set(K_ADS, ads); renderAds(); toast("Annonce supprimée."); }
+  else { d.dataset.armed="1"; d.textContent="Confirmer ?"; d.classList.remove("ghost"); setTimeout(function(){ if(d.isConnected){ delete d.dataset.armed; d.textContent="Supprimer"; d.classList.add("ghost"); } }, 3000); }
+});
+$("sort").addEventListener("change", renderAds);
+$("copy-list").addEventListener("click", function(){ copy(listText(), "Sélection copiée."); });
+
+/* ---------- onglets ---------- */
+function route(){
+  var v = location.hash==="#annonces" ? "annonces" : "recherche";
+  ["recherche","annonces"].forEach(function(n){
+    $("view-"+n).classList.toggle("on", n===v);
+    if(n===v) $("tab-"+n).setAttribute("aria-current","page"); else $("tab-"+n).removeAttribute("aria-current");
+  });
+}
+window.addEventListener("hashchange", route);
+
+route(); renderSites(); renderAds();
+})();
+</script>
+</body>
+</html>
