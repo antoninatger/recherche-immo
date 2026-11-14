@@ -95,6 +95,10 @@ label.f input,label.f select,label.f textarea{width:100%;padding:10px 12px;borde
 .chip.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
 .site .acts{display:flex;gap:6px}
 
+.pick summary{cursor:pointer;font-weight:600}
+.pick-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.pick-list button{padding:8px 12px;border-radius:99px;border:1px solid var(--line);background:var(--bg);color:var(--muted);cursor:pointer;font-size:.88rem;text-decoration:line-through}
+.pick-list button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);border-color:transparent;font-weight:600;text-decoration:none}
 .banner{background:var(--warn-soft);color:var(--warn);border-radius:12px;padding:10px 14px;font-size:.9rem}
 .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
@@ -202,6 +206,15 @@ footer{color:var(--muted);font-size:.8rem;padding:10px 0 30px}
     <p class="hint" style="margin-top:10px">Touche ✓ après avoir regardé un site pour savoir où tu en es. Les liens marqués « via Google » cherchent dans les annonces de ce site quand il n'accepte pas les critères dans son adresse.</p>
   </div>
 
+  <details class="panel pick" id="pick">
+    <summary id="pick-sum">Choisir les sites</summary>
+    <div class="pick-list" id="pick-list"></div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn small" type="button" id="pick-all">Tout inclure</button>
+      <button class="btn small" type="button" id="pick-main">Seulement les incontournables</button>
+    </div>
+  </details>
+
   <div id="site-groups" style="display:grid;gap:14px"></div>
 
   <div class="row">
@@ -272,7 +285,7 @@ var store = {
   get: function(k, d){ try{ var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } },
   set: function(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
 };
-var K_CRIT = "immo-criteres-v1", K_SEEN = "immo-vus-v1", K_ADS = "immo-annonces-v1";
+var K_CRIT = "immo-criteres-v1", K_SEEN = "immo-vus-v1", K_ADS = "immo-annonces-v1", K_OFF = "immo-sites-exclus-v1";
 
 /* ---------- utilitaires ---------- */
 function $(id){ return document.getElementById(id); }
@@ -365,11 +378,16 @@ function linkFor(s){
   return {url:google(s.domain), level:"google"};
 }
 var seen = store.get(K_SEEN, {});
+var off = store.get(K_OFF, {});
+function activeSites(){ return SITES.filter(function(s){ return !off[s.id]; }); }
 var LEVEL = {filtres:["Tes filtres appliqués","good"], ville:["Ville appliquée","good"], google:["Via Google",""], site:["Ouvre l'appli ou le site","warn"]};
 
 function renderSites(){
+  var act = activeSites();
+  $("pick-sum").textContent = "Choisir les sites (" + act.length + " sur " + SITES.length + " inclus)";
+  $("pick-list").innerHTML = SITES.map(function(s){ return '<button type="button" data-pick="'+s.id+'" aria-pressed="'+(!off[s.id])+'">'+esc(s.name)+'</button>'; }).join("");
   var groups = {}, order = [];
-  SITES.forEach(function(s){ if(!groups[s.g]){ groups[s.g]=[]; order.push(s.g); } groups[s.g].push(s); });
+  act.forEach(function(s){ if(!groups[s.g]){ groups[s.g]=[]; order.push(s.g); } groups[s.g].push(s); });
   var html = order.map(function(g){
     return '<div class="group"><h3>'+esc(g)+'</h3><div class="sites">' + groups[g].map(function(s){
       var l = linkFor(s), lv = LEVEL[l.level], isSeen = !!seen[s.id];
@@ -381,14 +399,14 @@ function renderSites(){
       '</div>';
     }).join("") + '</div></div>';
   }).join("");
-  $("site-groups").innerHTML = html;
-  var n = SITES.filter(function(s){ return seen[s.id]; }).length;
-  $("seen-label").textContent = n + " / " + SITES.length + " sites vus";
-  $("seen-bar").style.width = (100*n/SITES.length) + "%";
+  $("site-groups").innerHTML = html || '<div class="empty">Aucun site inclus. Ouvre « Choisir les sites » pour en remettre.</div>';
+  var n = act.filter(function(s){ return seen[s.id]; }).length;
+  $("seen-label").textContent = n + " / " + act.length + " sites vus";
+  $("seen-bar").style.width = (act.length ? 100*n/act.length : 0) + "%";
 }
 function searchText(short){
   var head = "Recherche immo : " + (crit.projet==="achat"?"achat":"location") + ", " + crit.type + (crit.ville ? ", " + crit.ville : "") + (crit.cp ? " " + crit.cp : "") + (crit.pmax ? ", max " + eur(num(crit.pmax)) : "") + (crit.smin ? ", " + crit.smin + " m² min" : "") + (crit.rmin ? ", " + crit.rmin + " pièces min" : "");
-  var list = (short ? SITES.filter(function(s){ return s.g==="Les incontournables" || s.id==="pap"; }) : SITES);
+  var list = (short ? SITES.filter(function(s){ return s.g==="Les incontournables" || s.id==="pap"; }) : activeSites());
   return head + "\n\n" + list.map(function(s){ return s.name + " : " + linkFor(s).url; }).join("\n");
 }
 $("site-groups").addEventListener("click", function(e){
@@ -397,8 +415,15 @@ $("site-groups").addEventListener("click", function(e){
   var o = e.target.closest("[data-open]");
   if(o && !seen[o.dataset.open]){ seen[o.dataset.open]=Date.now(); store.set(K_SEEN, seen); setTimeout(renderSites, 300); }
 });
+$("pick-list").addEventListener("click", function(e){
+  var b = e.target.closest("[data-pick]"); if(!b) return;
+  var id = b.dataset.pick; if(off[id]) delete off[id]; else off[id]=1;
+  store.set(K_OFF, off); renderSites();
+});
+$("pick-all").addEventListener("click", function(){ off={}; store.set(K_OFF, off); renderSites(); });
+$("pick-main").addEventListener("click", function(){ off={}; SITES.forEach(function(s){ if(s.g!=="Les incontournables") off[s.id]=1; }); store.set(K_OFF, off); renderSites(); });
 $("seen-reset").addEventListener("click", function(){ seen={}; store.set(K_SEEN, seen); renderSites(); });
-$("copy-links").addEventListener("click", function(){ copy(searchText(false), "Les " + SITES.length + " liens sont copiés."); });
+$("copy-links").addEventListener("click", function(){ copy(searchText(false), "Les " + activeSites().length + " liens sont copiés."); });
 
 /* ---------- annonces ---------- */
 var ads = store.get(K_ADS, []);
